@@ -25,8 +25,6 @@ static struct Trapframe *last_tf;
  */
 struct Gatedesc idt[256] = { { 0 } };
 struct Pseudodesc idt_pd = {0,0};
-
-
 static const char *trapname(int trapno)
 {
 	static const char * const excnames[] = {
@@ -60,13 +58,63 @@ static const char *trapname(int trapno)
 }
 
 
+extern void TRAPH_divide(void);
+void TRAPH_debug(void);
+void TRAPH_nmi(void);
+void TRAPH_breakpoint(void);
+void TRAPH_overflow(void);
+void TRAPH_boundcheck(void);
+void TRAPH_illegalop(void);
+void TRAPH_devicena(void);
+extern void TRAPH_doublefault(void);
+extern void TRAPH_invalidtss(void);
+extern void TRAPH_segmentnotpresent(void);
+void TRAPH_stackexception(void);
+void TRAPH_generalprotectionfault(void);
+extern void TRAPH_pagefault(void);
+void TRAPH_syscall(void);
+void TRAPH_floatingpointerror(void);
+void TRAPH_alignmentcheck(void);
+void TRAPH_machinecheck(void);
+void TRAPH_simderror(void);
+void TRAPH_timer(void);
+void TRAPH_keyboard(void);
+void TRAPH_serial(void);
+//void TRAPH_spurious(void);
+//void TRAPH_ide(void);
+
+
 void
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
-
 	// LAB 3: Your code here.
-    idt_pd.pd_lim = sizeof(idt)-1;
+	SETGATE(idt[T_DIVIDE], 1, GD_KT, TRAPH_divide, 0);
+	SETGATE(idt[T_DEBUG], 1, GD_KT,TRAPH_debug,0);
+	SETGATE(idt[T_NMI], 1, GD_KT, TRAPH_nmi,0);
+	SETGATE(idt[T_BRKPT], 1, GD_KT, TRAPH_breakpoint,3);
+	SETGATE(idt[T_OFLOW], 1, GD_KT, TRAPH_overflow,0);
+	SETGATE(idt[T_BOUND], 1, GD_KT, TRAPH_boundcheck,0);
+	SETGATE(idt[T_ILLOP], 1, GD_KT, TRAPH_illegalop,0);
+	SETGATE(idt[T_DEVICE], 1, GD_KT, TRAPH_devicena,0);
+	SETGATE(idt[T_DBLFLT], 1, GD_KT, TRAPH_doublefault,0);
+	SETGATE(idt[T_TSS], 1, GD_KT, TRAPH_invalidtss,0);
+	SETGATE(idt[T_SEGNP], 1, GD_KT, TRAPH_segmentnotpresent,0);
+	SETGATE(idt[T_STACK], 1, GD_KT,TRAPH_stackexception,0);
+	SETGATE(idt[T_GPFLT], 1, GD_KT, TRAPH_generalprotectionfault,0);
+	SETGATE(idt[T_PGFLT], 1, GD_KT, TRAPH_pagefault,0);
+	SETGATE(idt[T_SYSCALL], 1, GD_KT, TRAPH_syscall,3);
+	SETGATE(idt[T_FPERR], 1, GD_KT, TRAPH_floatingpointerror,0);
+	SETGATE(idt[T_ALIGN], 1, GD_KT, TRAPH_alignmentcheck,0);
+        SETGATE(idt[T_MCHK], 1, GD_KT, TRAPH_machinecheck,0);
+	SETGATE(idt[T_SIMDERR], 1, GD_KT, TRAPH_simderror,0);
+	SETGATE(idt[IRQ_TIMER + IRQ_OFFSET], 0, GD_KT, TRAPH_timer, 0);
+	SETGATE(idt[IRQ_KBD + IRQ_OFFSET], 0, GD_KT, TRAPH_keyboard, 0);
+	SETGATE(idt[IRQ_SERIAL + IRQ_OFFSET], 0, GD_KT, TRAPH_serial, 0);
+  //  	SETGATE(idt[IRQ_SPURIOUS + IRQ_OFFSET], 0, GD_KT, TRAPH_spurious, 0);
+//	SETGATE(idt[IRQ_SPURIOUS + IRQ_IDE], 0, GD_KT, TRAPH_ide, 0);
+	
+	idt_pd.pd_lim = sizeof(idt)-1;
     idt_pd.pd_base = (uint64_t)idt;
 	// Per-CPU setup
 	trap_init_percpu();
@@ -97,6 +145,7 @@ print_trapframe(struct Trapframe *tf)
 	print_regs(&tf->tf_regs);
 	cprintf("  es   0x----%04x\n", tf->tf_es);
 	cprintf("  ds   0x----%04x\n", tf->tf_ds);
+	//cprintf("\nHAHAHAHAHAHA:	%08x\n",tf->tf_trapno);
 	cprintf("  trap 0x%08x %s\n", tf->tf_trapno, trapname(tf->tf_trapno));
 	// If this trap was a page fault that just happened
 	// (so %cr2 is meaningful), print the faulting linear address.
@@ -148,7 +197,23 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-
+	if(tf->tf_trapno == T_PGFLT)
+	{
+		page_fault_handler(tf);
+		return;		
+	}
+	
+	else if(tf->tf_trapno == T_BRKPT)
+	{	
+		monitor(tf);
+		return;
+	}
+	else if(tf->tf_trapno == T_SYSCALL)
+	{
+		print_trapframe(tf);
+		tf->tf_regs.reg_rax=syscall(tf->tf_regs.reg_rax, tf->tf_regs.reg_rdx, tf->tf_regs.reg_rcx, tf->tf_regs.reg_rbx, tf->tf_regs.reg_rdi, tf->tf_regs.reg_rsi);
+		return;
+	}
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -172,7 +237,7 @@ trap(struct Trapframe *tf)
 	// the interrupt path.
 	assert(!(read_eflags() & FL_IF));
 
-	cprintf("Incoming TRAP frame at %p\n", tf);
+	cprintf("\nIncoming TRAP frame at %p\n", tf);
 
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
@@ -203,17 +268,20 @@ void
 page_fault_handler(struct Trapframe *tf)
 {
 	uint64_t fault_va;
-
+	uint16_t mode;
 	// Read processor's CR2 register to find the faulting address
 	fault_va = rcr2();
 
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
-
+	mode = (tf->tf_cs & 0x3);
+	if(mode == 0){//kernel mode
+		print_trapframe(tf);
+		panic("Kernel mode page fault!!");
+	}
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
-
 	// Destroy the environment that caused the fault.
 	cprintf("[%08x] user fault va %08x ip %08x\n",
 		curenv->env_id, fault_va, tf->tf_rip);

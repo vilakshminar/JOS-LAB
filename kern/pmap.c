@@ -267,7 +267,7 @@ x64_vm_init(void)
 	// array.  'npages' is the number of physical pages in memory.
 	// Your code goes here:
 	pages=(struct PageInfo *)boot_alloc(npages*sizeof(struct PageInfo));
-        
+	envs=(struct Env *)boot_alloc(NENV*sizeof(struct Env));        
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
@@ -296,7 +296,7 @@ x64_vm_init(void)
 	//    - the new image at UPAGES -- kernel R, us/er R
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
-<<<<<<< HEAD
+//<<<<<<< HEAD
 	// Your code goes here:
 
 	//////////////////////////////////////////////////////////////////////
@@ -306,10 +306,11 @@ x64_vm_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
-=======
+	boot_map_region(pml4e,UENVS,PTSIZE,PADDR(envs), PTE_U | PTE_P );
+//==/=====
 	/// Your code goes here:
 	boot_map_region(pml4e,UPAGES,PTSIZE,PADDR(pages) ,PTE_W | PTE_P);
->>>>>>> lab2
+//>>>>>>> lab2
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -1019,10 +1020,48 @@ static uintptr_t user_mem_check_addr;
 // Returns 0 if the user program can access this range of addresses,
 // and -E_FAULT otherwise.
 //
-	int
-user_mem_check(struct Env *env, const void *va, size_t len, int perm)
+int user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+	user_mem_check_addr = (uintptr_t) va; 
+	uintptr_t start_addr=(uintptr_t)va;
+	uintptr_t end_addr=start_addr+len;
+	uintptr_t addr;	
+	for(addr=start_addr;addr<end_addr;addr++)
+	{
+		if(addr>=ULIM)
+		{
+			if(user_mem_check_addr < addr) {
+				user_mem_check_addr =  addr;
+			}
+			return -E_FAULT;
+		}	
+	}
+	uintptr_t start_page=ROUNDDOWN(start_addr, PGSIZE);
+	uintptr_t end_page=ROUNDUP(end_addr, PGSIZE);
+	pte_t *pte;
+	pte_t entry;
+	while(start_page < end_page)
+	{
+		pte = pml4e_walk(env->env_pml4e,(const void *)start_page, 0);
+		if(!pte){
+			if(user_mem_check_addr < start_page) {
+				user_mem_check_addr =  start_page;
+			}
+			return -E_FAULT;
+		}
+ 		entry = *pte;
+		perm = perm | PTE_P | PTE_U;
+		entry = entry & perm;
+		if(entry != perm)
+		{
+			if(user_mem_check_addr < start_page) {
+				user_mem_check_addr =  start_page;
+			}
+			return -E_FAULT;   	
+		}
+		start_page+=PGSIZE;
+	}
 	return 0;
 
 }

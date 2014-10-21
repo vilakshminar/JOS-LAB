@@ -366,11 +366,7 @@ mem_init_mp(void)
 	// to as its kernel stack. CPU i's kernel stack grows down from virtual
 	// address kstacktop_i = KSTACKTOP - i * (KSTKSIZE + KSTKGAP), and is
 	// divided into two pieces, just like the single stack you set up in
-//<<<<<<< HEAD
-	// mem_init:
-//=======
 	// x86_vm_init:
-//>>>>>>> lab3
 	//     * [kstacktop_i - KSTKSIZE, kstacktop_i)
 	//          -- backed by physical memory
 	//     * [kstacktop_i - (KSTKSIZE + KSTKGAP), kstacktop_i - KSTKSIZE)
@@ -380,9 +376,6 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-//<<<<<<< HEAD
-
-//=======
  	int i;
 	uintptr_t kstacktop_i;
 	for(i=0;i<NCPU;i++)
@@ -390,7 +383,6 @@ mem_init_mp(void)
 		kstacktop_i= KSTACKTOP-i*(KSTKSIZE + KSTKGAP);
 		boot_map_region(boot_pml4e,kstacktop_i-KSTKSIZE,KSTKSIZE,PADDR(percpu_kstacks[i]),PTE_W|PTE_P);
 	}	
-//>>>>>>> lab3
 }
 
 // --------------------------------------------------------------
@@ -1088,9 +1080,6 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-//<<<<<<< HEAD
-	//panic("mmio_map_region not implemented");
-//=======
 	uintptr_t alloc_base,check_addr;
 	int new_size=ROUNDUP(size,PGSIZE);
 	check_addr=new_size+base;
@@ -1101,7 +1090,6 @@ mmio_map_region(physaddr_t pa, size_t size)
 	base+=new_size;
 	return (void *)alloc_base;
 	//panic("mmio_map_region not implemented");
-//>>>>>>> lab3
 }
 
 static uintptr_t user_mem_check_addr;
@@ -1623,10 +1611,6 @@ page_check(void)
 	assert(check_va2pa(boot_pml4e, mm1) == 0);
 	assert(check_va2pa(boot_pml4e, mm1+PGSIZE) == PGSIZE);
 	assert(check_va2pa(boot_pml4e, mm2) == 0);
-//<<<<<<< HEAD
-	cprintf("failing %x %x\n", mm2+PGSIZE, check_va2pa(boot_pml4e, mm2+PGSIZE));
-//=======
-//>>>>>>> lab3
 	assert(check_va2pa(boot_pml4e, mm2+PGSIZE) == ~0);
 	// check permissions
 	assert(*pml4e_walk(boot_pml4e, (void*) mm1, 0) & (PTE_W|PTE_PWT|PTE_PCD));

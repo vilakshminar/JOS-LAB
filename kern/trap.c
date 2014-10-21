@@ -242,21 +242,6 @@ trap_dispatch(struct Trapframe *tf)
 		return;
 	}
 
-//<<<<<<< HEAD
-	// Handle spurious interrupts
-	// The hardware sometimes raises these because of noise on the
-	// IRQ line or other reasons. We don't care.
-	if (tf->tf_trapno == IRQ_OFFSET + IRQ_SPURIOUS) {
-		cprintf("Spurious interrupt on irq 7\n");
-		print_trapframe(tf);
-		return;
-	}
-
-	// Handle clock interrupts. Don't forget to acknowledge the
-	// interrupt using lapic_eoi() before calling the scheduler!
-	// LAB 4: Your code here.
-
-//=======
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
@@ -284,7 +269,6 @@ trap_dispatch(struct Trapframe *tf)
 		tf->tf_regs.reg_rax=syscall(tf->tf_regs.reg_rax, tf->tf_regs.reg_rdx, tf->tf_regs.reg_rcx, tf->tf_regs.reg_rbx, tf->tf_regs.reg_rdi, tf->tf_regs.reg_rsi);
 		return;
 	}
-//>>>>>>> lab3
 //>>>>>>> lab3
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
@@ -320,21 +304,15 @@ trap(struct Trapframe *tf)
 
 //<<<<<<< HEAD
 //=======
-//<<<<<<< HEAD
-//=======
 	//cprintf("\nIncoming TRAP frame at %p\n", tf);
 
-//>>>>>>> lab3
 //>>>>>>> lab3
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
 		// Acquire the big kernel lock before doing any
 		// serious kernel work.
 		// LAB 4: Your code here.
-//<<<<<<< HEAD
-//=======
 		lock_kernel();
-//>>>>>>> lab3
 		assert(curenv);
 
 		// Garbage collect if current enviroment is a zombie
@@ -388,9 +366,6 @@ page_fault_handler(struct Trapframe *tf)
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
 //<<<<<<< HEAD
-=======
-//<<<<<<< HEAD
-//>>>>>>> lab3
 
 	// Call the environment's page fault upcall, if one exists.  Set up a
 	// page fault stack frame on the user exception stack (below
@@ -422,14 +397,6 @@ page_fault_handler(struct Trapframe *tf)
 	//   (the 'tf' variable points at 'curenv->env_tf').
 
 	// LAB 4: Your code here.
-//<<<<<<< HEAD
-
-	// Destroy the environment that caused the fault.
-	cprintf("[%08x] user fault va %08x ip %08x\n",
-		curenv->env_id, fault_va, tf->tf_rip);
-	print_trapframe(tf);
-	env_destroy(curenv);
-//=======
 	uint64_t ex_top_of_stack,size_of_word;
 	struct UTrapframe *user_trap_frame;
 	if(!(curenv->env_pgfault_upcall))
@@ -464,5 +431,4 @@ page_fault_handler(struct Trapframe *tf)
         	tf->tf_rip = (uint64_t)curenv->env_pgfault_upcall;
 		env_run(curenv);
 	}
-//>>>>>>> lab3
 }

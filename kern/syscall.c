@@ -83,9 +83,6 @@ sys_exofork(void)
 	// will appear to return 0.
 
 	// LAB 4: Your code here.
-//<<<<<<< HEAD
-	//panic("sys_exofork not implemented");
-//=======
 	struct Env *child;
 	int r = env_alloc(&child, curenv->env_id);
 	if(r < 0)
@@ -96,7 +93,6 @@ sys_exofork(void)
 	child->env_parent_id = curenv->env_id;
 	return child->env_id;
 
-//>>>>>>> lab3
 }
 
 // Set envid's env_status to status, which must be ENV_RUNNABLE
@@ -116,9 +112,6 @@ sys_env_set_status(envid_t envid, int status)
 	// envid's status.
 
 	// LAB 4: Your code here.
-//<<<<<<< HEAD
-	//panic("sys_env_set_status not implemented");
-//=======
 	int envid2env_return;
 	struct Env *env;
 	if((status!=ENV_RUNNABLE) && (status!=ENV_NOT_RUNNABLE))
@@ -129,7 +122,6 @@ sys_env_set_status(envid_t envid, int status)
 	env->env_status=status;
 	return 0;
 	//panic("sys_env_set_status not implemented");
-//>>>>>>> lab3
 }
 
 // Set the page fault upcall for 'envid' by modifying the corresponding struct
@@ -144,9 +136,6 @@ static int
 sys_env_set_pgfault_upcall(envid_t envid, void *func)
 {
 	// LAB 4: Your code here.
-//<<<<<<< HEAD
-	//panic("sys_env_set_pgfault_upcall not implemented");
-//=======
 	struct Env *env;
 	int envid2env_return=envid2env(envid,&env,1);
         if(envid2env_return<0)
@@ -154,7 +143,6 @@ sys_env_set_pgfault_upcall(envid_t envid, void *func)
         env->env_pgfault_upcall = func;
         return 0;
 //	panic("sys_env_set_pgfault_upcall not implemented");
-//>>>>>>> lab3
 }
 
 // Allocate a page of memory and map it at 'va' with permission
@@ -184,9 +172,6 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	//   allocated!
 
 	// LAB 4: Your code here.
-//<<<<<<< HEAD
-	//panic("sys_page_alloc not implemented");
-//=======
 	int envid2env_return,page_insert_return;
 	struct Env *env;
 	int permbits;
@@ -213,7 +198,6 @@ sys_page_alloc(envid_t envid, void *va, int perm)
 	return 0;
 	
 //	panic("sys_page_alloc not implemented");
-//>>>>>>> lab3
 }
 
 // Map the page of memory at 'srcva' in srcenvid's address space
@@ -244,9 +228,6 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	//   check the current permissions on the page.
 
 	// LAB 4: Your code here.
-//<<<<<<< HEAD
-	//panic("sys_page_map not implemented");
-//=======
 	int srcenvid_return,dstenvid_return,page_insert_return;
 	struct Env *srcenv,*dstenv;
 	struct PageInfo *pg;
@@ -285,7 +266,6 @@ sys_page_map(envid_t srcenvid, void *srcva,
 	
 	
 	//panic("sys_page_map not implemented");
-//>>>>>>> lab3
 }
 
 // Unmap the page of memory at 'va' in the address space of 'envid'.
@@ -301,9 +281,6 @@ sys_page_unmap(envid_t envid, void *va)
 	// Hint: This function is a wrapper around page_remove().
 
 	// LAB 4: Your code here.
-//<<<<<<< HEAD
-	//panic("sys_page_unmap not implemented");
-//=======
 	struct Env *env;
 	int envid2env_return;
 	envid2env_return=envid2env(envid,&env,1);
@@ -317,7 +294,6 @@ sys_page_unmap(envid_t envid, void *va)
 
 
 	//panic("sys_page_unmap not implemented");
-//>>>>>>> lab3
 }
 
 // Try to send 'value' to the target env 'envid'.
@@ -361,12 +337,6 @@ sys_page_unmap(envid_t envid, void *va)
 static int
 sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 {
-//<<<<<<< HEAD
-	// LAB 4: Your code here.
-	//panic("sys_ipc_try_send not implemented");
-//}
-
-//=====
 	int permbits;
 	struct Env *send_env=curenv;
 	struct Env *recv_env;
@@ -447,7 +417,6 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 
 
 
-//>>>>>>> lab3
 // Block until a value is ready.  Record that you want to receive
 // using the env_ipc_recving and env_ipc_dstva fields of struct Env,
 // mark yourself not runnable, and then give up the CPU.
@@ -462,10 +431,6 @@ sys_ipc_try_send(envid_t envid, uint32_t value, void *srcva, unsigned perm)
 static int
 sys_ipc_recv(void *dstva)
 {
-//<<<<<<< HEAD
-	// LAB 4: Your code here.
-	//panic("sys_ipc_recv not implemented");
-//=======
 
 	// LAB 4: Your code here.
 	struct Env *env=curenv;
@@ -482,7 +447,6 @@ sys_ipc_recv(void *dstva)
 	curenv->env_status=ENV_NOT_RUNNABLE;
 	curenv->env_tf.tf_regs.reg_rax=0;
 	sys_yield();
-//>>>>>>> lab3
 	return 0;
 }
 

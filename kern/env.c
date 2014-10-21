@@ -271,11 +271,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 	// Enable interrupts while in user mode.
 	// LAB 4: Your code here.
-<<<<<<< HEAD
-
-=======
 	e->env_tf.tf_eflags=e->env_tf.tf_eflags|FL_IF;	
->>>>>>> lab3
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
 
@@ -564,11 +560,6 @@ env_destroy(struct Env *e)
 	void
 env_pop_tf(struct Trapframe *tf)
 {
-<<<<<<< HEAD
-	// Record the CPU we are running on for user-space debugging
-	curenv->env_cpunum = cpunum();
-
-=======
 //<<<<<<< HEAD
 	// Record the CPU we are running on for user-space debugging
 	curenv->env_cpunum = cpunum();
@@ -576,7 +567,6 @@ env_pop_tf(struct Trapframe *tf)
 //=======
 	//cprintf("Trap frame address:%x",tf);
 //>>>>>>> lab3
->>>>>>> lab3
 	__asm __volatile("movq %0,%%rsp\n"
 			 POPA
 			 "movw (%%rsp),%%es\n"

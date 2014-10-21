@@ -60,7 +60,11 @@ i386_init(void)
 
 	// Acquire the big kernel lock before waking up APs
 	// Your code here:
+//<<<<<<< HEAD
 
+//=======
+	lock_kernel();
+//>>>>>>> lab3
 	// Starting non-boot CPUs
 	boot_aps();
 
@@ -69,13 +73,30 @@ i386_init(void)
 	ENV_CREATE(TEST, ENV_TYPE_USER);
 #else
 	// Touch all you want.
+//<<<<<<< HEAD
 	ENV_CREATE(user_primes, ENV_TYPE_USER);
-#endif // TEST*
+//=======
+	ENV_CREATE(user_spin, ENV_TYPE_USER);
+	ENV_CREATE(user_spin, ENV_TYPE_USER);
+//	ENV_CREATE(user_yield, ENV_TYPE_USER);
+//	ENV_CREATE(user_yield, ENV_TYPE_USER);
+//	ENV_CREATE(user_yield, ENV_TYPE_USER);
+//	ENV_CREATE(user_yield, ENV_TYPE_USER);
+	//ENV_CREATE(user_yield, ENV_TYPE_USER);
 
+//>>>>>>> lab3
+#endif // TEST*
 	// Schedule and run the first user environment!
 	sched_yield();
 }
 
+//<<<<<<< HEAD
+	// Schedule and run the first user environment!
+	sched_yield();
+}
+
+//=======
+//>>>>>>> lab3
 // While boot_aps is booting a given CPU, it communicates the per-core
 // stack pointer that should be loaded by mpentry.S to that CPU in
 // this variable.
@@ -115,6 +136,10 @@ mp_main(void)
 	lcr3(boot_cr3);
 	cprintf("SMP: CPU %d starting\n", cpunum());
 
+//<<<<<<< HEAD
+//=======
+
+//>>>>>>> lab3
 	lapic_init();
 	env_init_percpu();
 	trap_init_percpu();
@@ -125,9 +150,15 @@ mp_main(void)
 	// only one CPU can enter the scheduler at a time!
 	//
 	// Your code here:
+//<<<<<<< HEAD
 
 	// Remove this after you finish Exercise 4
 	for (;;);
+//=======
+	lock_kernel();
+	sched_yield();
+	// Remove this after you finish Exercise 4
+//>>>>>>> lab3
 }
 
 /*

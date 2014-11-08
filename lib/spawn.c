@@ -300,7 +300,50 @@ map_segment(envid_t child, uintptr_t va, size_t memsz,
 static int
 copy_shared_pages(envid_t child)
 {
-	// LAB 5: Your code here.
-	return 0;
+	int vpml4e_entries,vpdpe_entries,perm,r;
+	uint64_t a,b,c,d,b1,c1,d1;
+        vpml4e_entries = VPML4E(UTOP);
+        vpdpe_entries = VPDPE(UTOP);
+	 for(c1=0,d1=0,b1=0,a=0;a<vpml4e_entries;a++)
+        {
+                if(uvpml4e[a] & PTE_P)
+                {
+                        for(b=0; b<vpdpe_entries;b++,b1++)
+                        {
+                                if(uvpde[b1] & PTE_P)
+                                {
+                                        for(c=0; c< NPDENTRIES; c++, c1++)
+                                        {
+                                                if(uvpd[c1] & PTE_P)
+                                                {
+                                                        for(d=0;d<NPTENTRIES;d++, d1++)
+                                                        {
+                                                                if((uvpt[d1] & PTE_SHARE))// && (f != VPN(UXSTACKTOP-PGSIZE)))
+                                                                {
+                                                                        void* addr=(void *)(d1 << PGSHIFT);
+                                                                        perm=uvpt[d1] & PTE_USER;
+                                                                        //cprintf("f:%08x\tUTOP:%08x\taddr:%08x\tuvpt[f]:%08x\tperm:%08x\n",f,UTOP,addr,uvpt[f],perm);
+                                                                        r = sys_page_map(0, addr, child, addr, perm);
+                                                                        if (r < 0)
+                                                                                panic("sys_page_map failed:%e",r);
+                                                                }
+                                                        }
+                                                }
+                                                else {
+                                                        d1 = (c1+1)*NPTENTRIES;
+                                                }
+                                        }
+                                }
+                                else {
+                                        c1 = (b+1) * NPDENTRIES;
+                                }
+                        }
+                }
+                else
+                {
+                        b1=(a+1)*NPDPENTRIES;
+                }
+	}	
+        return 0;
 }
 

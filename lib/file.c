@@ -2,7 +2,7 @@
 #include <inc/string.h>
 #include <inc/lib.h>
 
-#define debug 0
+#define debug 0 
 
 union Fsipc fsipcbuf __attribute__((aligned(PGSIZE)));
 
@@ -67,7 +67,22 @@ open(const char *path, int mode)
 	// file descriptor.
 
 	// LAB 5: Your code here
-	panic ("open not implemented");
+	struct Fd *fd;
+	int r;
+	
+	if(strlen(path)>= MAXPATHLEN)
+                return -E_BAD_PATH;
+	if((r=fd_alloc(&fd))<0)
+		return r;
+	strcpy(fsipcbuf.open.req_path,path);
+	fsipcbuf.open.req_omode=mode;
+	r=fsipc(FSREQ_OPEN, fd);
+	if(r<0)
+	{
+		fd_close(fd,0);
+		return r;
+	}
+	return fd2num(fd);
 }
 
 // Flush the file descriptor.  After this the fileid is invalid.
@@ -98,7 +113,17 @@ devfile_read(struct Fd *fd, void *buf, size_t n)
 	// bytes read will be written back to fsipcbuf by the file
 	// system server.
 	// LAB 5: Your code here
-	panic("devfile_read not implemented");
+	ssize_t r;
+	
+	fsipcbuf.read.req_fileid = fd->fd_file.id;
+	fsipcbuf.read.req_n = n;
+	if ((r = fsipc(FSREQ_READ, NULL)) < 0)
+	{
+		return r;
+	}
+	if(r > 0)
+		memmove(buf, fsipcbuf.readRet.ret_buf, r);
+	return r;
 }
 
 

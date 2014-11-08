@@ -205,7 +205,7 @@ env_setup_vm(struct Env *e)
 	e->env_pml4e=(pml4e_t *)page2kva(p);
 	e->env_cr3=page2pa(p);
 	p->pp_ref++;
-	e->env_pml4e[1]=boot_pml4e[1] | ((PTE_P | PTE_U) & (~PTE_W));
+	e->env_pml4e[1]=boot_pml4e[1] | (PTE_P & ~(PTE_W|PTE_U));
 	// UVPT maps the env's own page table read-only.
 	// Permissions: kernel R, user R
 	e->env_pml4e[PML4(UVPT)] = e->env_cr3 | PTE_P | PTE_U;
@@ -442,9 +442,11 @@ void
 env_create(uint8_t *binary, enum EnvType type)
 {
 	// LAB 3: Your code here.
+//<<<<<<< HEAD
 
 	// If this is the file server (type == ENV_TYPE_FS) give it I/O privileges.
 	// LAB 5: Your code here.
+//=======
 	struct Env *newenv;
 	int result;
 	result=env_alloc(&newenv,0);
@@ -455,6 +457,11 @@ env_create(uint8_t *binary, enum EnvType type)
 	}
 	load_icode(newenv,binary);
 	newenv->env_type=type;
+	if(type == ENV_TYPE_FS)
+		newenv->env_tf.tf_eflags |= FL_IOPL_MASK;
+	//else
+	//	newenv->env_tf.tf_eflags |= FL_IOPL_0;
+//>>>>>>> lab4
 }
 
 //
@@ -563,8 +570,13 @@ env_destroy(struct Env *e)
 	void
 env_pop_tf(struct Trapframe *tf)
 {
+//<<<<<<< HEAD
 	// Record the CPU we are running on for user-space debugging
 	curenv->env_cpunum = cpunum();
+
+//=======
+	//cprintf("Trap frame address:%x",tf);
+//>>>>>>> lab3
 	__asm __volatile("movq %0,%%rsp\n"
 			 POPA
 			 "movw (%%rsp),%%es\n"

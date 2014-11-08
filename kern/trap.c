@@ -244,13 +244,23 @@ trap_dispatch(struct Trapframe *tf)
 	// Handle clock interrupts. Don't forget to acknowledge the
 	// interrupt using lapic_eoi() before calling the scheduler!
 	// LAB 4: Your code here.
+	if(tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER )
+        {
+                lapic_eoi();
+                sched_yield();
+                return;
+        }
+
 	// Handle keyboard and serial interrupts.
 	// LAB 5: Your code here.
-
-	if(tf->tf_trapno == IRQ_OFFSET + IRQ_TIMER )
+	if(tf->tf_trapno == IRQ_OFFSET+IRQ_KBD)
 	{
-		lapic_eoi();
-		sched_yield();
+		kbd_intr();
+		return;
+	}
+	if(tf->tf_trapno == IRQ_OFFSET+IRQ_SERIAL)
+	{
+		serial_intr();
 		return;
 	}
 	if(tf->tf_trapno == T_PGFLT)
@@ -270,6 +280,8 @@ trap_dispatch(struct Trapframe *tf)
 		tf->tf_regs.reg_rax=syscall(tf->tf_regs.reg_rax, tf->tf_regs.reg_rdx, tf->tf_regs.reg_rcx, tf->tf_regs.reg_rbx, tf->tf_regs.reg_rdi, tf->tf_regs.reg_rsi);
 		return;
 	}
+//>>>>>>> lab3
+//>>>>>>> lab4
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -302,7 +314,11 @@ trap(struct Trapframe *tf)
 	// the interrupt path.
 	assert(!(read_eflags() & FL_IF));
 
+//<<<<<<< HEAD
+//=======
+	//cprintf("\nIncoming TRAP frame at %p\n", tf);
 
+//>>>>>>> lab3
 	if ((tf->tf_cs & 3) == 3) {
 		// Trapped from user mode.
 		// Acquire the big kernel lock before doing any
@@ -361,6 +377,7 @@ page_fault_handler(struct Trapframe *tf)
 	}
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
+//<<<<<<< HEAD
 
 	// Call the environment's page fault upcall, if one exists.  Set up a
 	// page fault stack frame on the user exception stack (below

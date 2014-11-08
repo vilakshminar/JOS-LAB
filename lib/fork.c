@@ -25,7 +25,7 @@ pgfault(struct UTrapframe *utf)
 
 	// LAB 4: Your code here.
 	if(!(err & FEC_WR) || !(uvpt[VPN(addr)] & PTE_COW))
-                panic("faulting access not a write faulting access not to a copy-on-write page");
+                panic("faulting access not to a write or copy-on-write page");
 	// Allocate a new page, map it at a temporary location (PFTEMP),
 	// copy the data from the old page to the new page, then move the new
 	// page to the old page's address.
@@ -61,33 +61,49 @@ pgfault(struct UTrapframe *utf)
 static int
 duppage(envid_t envid, unsigned pn)
 {
-	int r;
 	// LAB 4: Your code here.
-	uint64_t addr;
-	uint64_t pte;
-	r=PTE_COW|PTE_P|PTE_U;
-	addr = (uint64_t) (pn * PGSIZE);
-	pte=uvpt[pn];
-	if(((pte & PTE_W) || (pte & PTE_COW))) 
+	void* addr;
+	pte_t pte;
+	int r,perm;
+	pte = uvpt[pn];
+	perm  = pte & PTE_SYSCALL;
+	addr = (void*)((uintptr_t)pn * PGSIZE);
+	//cprintf("addr:%08x\tpte:%08x\tPTE_SYSCALL:%08x\tpte&PTE_SYSCALL:%08x\tPTE_SHARE:%08x\n",addr,pte,PTE_SYSCALL,pte&PTE_SYSCALL,PTE_SHARE);
+	//shared page
+	if(perm & PTE_SHARE)
 	{
-		r = sys_page_map(0, (void *)addr, envid, (void *)addr, PTE_P|PTE_U|PTE_COW); 
+                r = sys_page_map(0, addr, envid, addr, perm);
+                if (r<0)
+                        panic("panic in duppage:sys_page_map:shared page");
+        }
+	//page with PTE_W or PTE_COW set
+	else if(((perm & PTE_W) || (perm & PTE_COW))) 
+	{
+		perm |= PTE_COW;
+		perm &= ~PTE_W;
+		r = sys_page_map(0, addr, envid, addr, perm); 
 		if(r<0) 
-	 		panic("duppage:sys_page_map"); 
-		r = sys_page_map(envid, (void*)addr, 0, (void*)addr, PTE_P|PTE_U|PTE_COW);
+	 		panic("panic in duppage:sys_page_map:PTE_W or PTE_COW page"); 
+		r = sys_page_map(0, addr, 0, addr, perm);
     		if (r<0) 
-      			panic("duppage:sys_page_map");
-
+      			panic("panic in duppage:sys_page_map:PTE_W or PTE_COW page");
+	}
+	//read-only page
+	else 
+	{
+		r = sys_page_map(0, addr, envid, addr, perm);
+    		if (r<0) 
+      			panic("duppage:sys_page_map:read-only-page");
 	}
 	return 0;
 }
-
 //
 // User-level fork with copy-on-write.
 // Set up our page fault handler appropriately.
 // Create a child.
 // Copy our address space and page fault handler setup to the child.
 // Then mark the child as runnable and return.
-//
+//gg
 // Returns: child's envid to the parent, 0 to the child, < 0 on error.
 // It is also OK to panic on error.
 //
@@ -120,46 +136,44 @@ fork(void)
         }
 	r=sys_page_alloc(envid,(void *)(UXSTACKTOP-PGSIZE),PTE_U|PTE_P|PTE_W);
 	if (r < 0)
-    		panic("in fork, sys_page_alloc error");
-	int a,b,c,d, e = 0, f = 0;
-	for(a=0;a<VPML4E(UTOP);a++)
+    		panic("panic in fork:sys_page_alloc:%e",r);
+	int vpml4e_entries,vpdpe_entries,a,b,c,d,c1,d1;
+	vpml4e_entries = VPML4E(UTOP);
+	vpdpe_entries = VPDPE(UTOP);
+	for(c1=0,d1=0,a=0;a<vpml4e_entries;a++)
 	{
 		if(uvpml4e[a] & PTE_P)
 		{
-			for(b=0; b<VPDPE(UTOP); b++)
+			for(b=0;b<vpdpe_entries;b++)
 			{
 				if(uvpde[b] & PTE_P)
 				{
-					for(c=0; c< NPDENTRIES; c++, e++)
+					for(c=0;c<NPDENTRIES;c++,c1++)
 					{
-						if(uvpd[e] & PTE_P)
+						if(uvpd[c1] & PTE_P)
 						{
-							for(d=0;d<NPTENTRIES;d++, f++)
+							for(d=0;d<NPTENTRIES;d++,d1++)
 							{
-								if((uvpt[f] & PTE_P) && (f != VPN(UXSTACKTOP-PGSIZE)))
-									duppage(envid,f);
+								if((uvpt[d1] & PTE_P) && (d1 != VPN(UXSTACKTOP-PGSIZE)))
+									 duppage(envid,d1);
 							}
 						}
-						else {
-							f = (e+1)*NPTENTRIES;
-						}
+						else
+							d1=(c1+1)*NPTENTRIES;
 					}
 				}
-				else {
-					e = (b+1) * NPDENTRIES;
-				}
+				else
+					c1=(b+1)*NPDENTRIES;
 			}
 		}
 	}
-
-
 	
 	r=sys_env_set_pgfault_upcall(envid,_pgfault_upcall);
 	if(r<0)
-		panic("in fork, sys_page_upcall error");
+		panic("panic in fork:sys_env_set_pgfault_upcall:%e",r);
 	r = sys_env_set_status(envid,ENV_RUNNABLE);
 	if(r<0)
-                panic("in fork, sys_env_set_status error");
+                panic("panic in fork:sys_env_set_status:%e",r);
 	return envid;
 }
 

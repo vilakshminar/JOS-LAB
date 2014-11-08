@@ -57,7 +57,7 @@ struct Env {
 
 	// Address space
 	pml4e_t *env_pml4e;		// Kernel virtual address of page dir
-    physaddr_t env_cr3;
+    	physaddr_t env_cr3;
 
 	// Exception handling
 	void *env_pgfault_upcall;	// Page fault upcall entry point

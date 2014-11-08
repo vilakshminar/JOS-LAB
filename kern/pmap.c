@@ -251,13 +251,6 @@ x64_vm_init(void)
 	// create initial page directory.
 	//panic("x64_vm_init: this function is not finished\n");
 	pml4e = boot_alloc(PGSIZE);
-	/*cprintf("pml4e:\t%0x\n",pml4e);
-	pml4e = boot_alloc(1000);
-	cprintf("pml4e:\t%0x\n",pml4e);
-	pml4e = boot_alloc(0);
-        cprintf("pml4e:\t%0x\n",pml4e);
-	pml4e = boot_alloc(0);
-	cprintf("pml4e:\t%0x\n",pml4e);*/
 	memset(pml4e, 0, PGSIZE);
 	boot_pml4e = pml4e;
 	boot_cr3 = PADDR(pml4e);
@@ -269,11 +262,12 @@ x64_vm_init(void)
 	// array.  'npages' is the number of physical pages in memory.
 	// Your code goes here:
 	pages=(struct PageInfo *)boot_alloc(npages*sizeof(struct PageInfo));
-	envs=(struct Env *)boot_alloc(NENV*sizeof(struct Env));        
 
 	//////////////////////////////////////////////////////////////////////
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
+	envs=(struct Env *)boot_alloc(NENV*sizeof(struct Env));
+	
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
 	// up the list of free physical pages. Once we've done so, all further
@@ -281,17 +275,9 @@ x64_vm_init(void)
 	// particular, we can now map memory using boot_map_region or page_insert
 	
 	page_init();
-	//check_page_alloc();
 	check_page_free_list(1);
         check_page_alloc();
 	page_check();
-	//struct PageInfo *testpage;
-	//testpage=page_alloc(1);
-	//check_page_alloc();
-	//page_free(testpage);
-	//check_page_alloc();
-	//pte_t *testentry=pml4e_walk(pml4e,0x0 , true);pte_t *result;
-	//page_check();
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory 
 	//////////////////////////////////////////////////////////////////////
@@ -300,8 +286,9 @@ x64_vm_init(void)
 	//    - the new image at UPAGES -- kernel R, us/er R
 	//      (ie. perm = PTE_U | PTE_P)
 	//    - pages itself -- kernel RW, user NONE
-//<<<<<<< HEAD
 	// Your code goes here:
+	size_t pagessize = ROUNDUP(npages*(sizeof(struct PageInfo)),PGSIZE);	
+	boot_map_region(boot_pml4e, UPAGES, pagessize, PADDR(pages),PTE_U | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Map the 'envs' array read-only by the user at linear address UENVS
@@ -310,11 +297,8 @@ x64_vm_init(void)
 	//    - the new image at UENVS  -- kernel R, user R
 	//    - envs itself -- kernel RW, user NONE
 	// LAB 3: Your code here.
-	boot_map_region(pml4e,UENVS,PTSIZE,PADDR(envs),  PTE_P | PTE_U );
-//==/=====
-	/// Your code goes here:
-	boot_map_region(pml4e,UPAGES,PTSIZE,PADDR(pages) ,PTE_W | PTE_P);
-//>>>>>>> lab2
+	size_t envssize = ROUNDUP(NENV*(sizeof(struct Env)),PGSIZE);
+	boot_map_region(boot_pml4e, UENVS, envssize, PADDR(envs), PTE_U | PTE_P);
 
 	//////////////////////////////////////////////////////////////////////
 	// Use the physical memory that 'bootstack' refers to as the kernel
@@ -327,7 +311,7 @@ x64_vm_init(void)
 	//       overwrite memory.  Known as a "guard page".
 	//     Permissions: kernel RW, user NONE
 	// Your code goes here:
-	boot_map_region(pml4e, KSTACKTOP-KSTKSIZE, KSTKSIZE,PADDR(bootstack) ,PTE_W | PTE_P);
+	boot_map_region(boot_pml4e, KSTACKTOP-KSTKSIZE, KSTKSIZE,PADDR(bootstack) ,PTE_P | PTE_W);
 	//////////////////////////////////////////////////////////////////////
 	// Map all of physical memory at KERNBASE. We have detected the number
     // of physical pages to be npages.
@@ -335,7 +319,7 @@ x64_vm_init(void)
 	//      the PA range [0, npages*PGSIZE)
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
-	boot_map_region(pml4e, KERNBASE, npages *PGSIZE, 0, PTE_W | PTE_P);
+	boot_map_region(boot_pml4e, KERNBASE, npages *PGSIZE, (physaddr_t)0x0, PTE_P | PTE_W);
 	// Check that the initial page directory has been set up correctly.
 	// Initialize the SMP-related parts of the memory map
 	mem_init_mp();
@@ -344,12 +328,13 @@ x64_vm_init(void)
 
 	//////////////////////////////////////////////////////////////////////
 	// Permissions: kernel RW, user NONE
-	pdpe_t *pdpe = KADDR(PTE_ADDR(pml4e[1]));
-	pde_t *pgdir = KADDR(PTE_ADDR(pdpe[0]));
-	lcr3(boot_cr3);
-//	check_page_free_list(1);
-//	check_page_alloc();
-	//page_check();
+        pdpe_t *pdpe = KADDR(PTE_ADDR(pml4e[1]));
+        pde_t *pgdir = KADDR(PTE_ADDR(pdpe[0]));
+
+        lcr3(boot_cr3);
+	//check_page_free_list(1);
+        //check_page_alloc();
+        //page_check();
 	check_page_free_list(0);
 }
 
@@ -381,7 +366,7 @@ mem_init_mp(void)
 	for(i=0;i<NCPU;i++)
 	{
 		kstacktop_i= KSTACKTOP-i*(KSTKSIZE + KSTKGAP);
-		boot_map_region(boot_pml4e,kstacktop_i-KSTKSIZE,KSTKSIZE,PADDR(percpu_kstacks[i]),PTE_W|PTE_P);
+		boot_map_region(boot_pml4e,kstacktop_i-KSTKSIZE,KSTKSIZE,PADDR(percpu_kstacks[i]),PTE_P | PTE_W);
 	}	
 }
 
@@ -423,17 +408,6 @@ void page_init(void)
     // NB: Make sure you preserve the direction in which your page_free_list 
     // is constructed
 	// NB: Remember to mark the memory used for initial boot page table i.e (va>=BOOT_PAGE_TABLE_START && va < BOOT_PAGE_TABLE_END) as in-use (not free)
-	/*size_t i;
-	struct PageInfo* last = NULL;
-	for (i = 0; i < npages; i++) {
-		pages[i].pp_ref = 0;
-		pages[i].pp_link = NULL;
-        if(last)
-            last->pp_link = &pages[i];
-        else
-            page_free_list = &pages[i];
-		last = &pages[i];
-	}*/
 	size_t i,temp;
         struct PageInfo *head = NULL,*tail=NULL;
 	physaddr_t phy;
@@ -973,10 +947,11 @@ page_lookup(pml4e_t *pml4e, void *va, pte_t **pte_store)
         else
                 return page;*/
 	struct PageInfo *page;
-        uint64_t addr;
         pte_t *temp;
-        temp=pml4e_walk(pml4e,va,1);
-        addr=*temp;
+        temp=pml4e_walk(pml4e,va,0);
+	if(temp==NULL)
+                return NULL;
+
         physaddr_t temp1 = *temp & ~0xFFF;
         //addr= addr&(0xffffffffff000);
 
@@ -987,10 +962,7 @@ page_lookup(pml4e_t *pml4e, void *va, pte_t **pte_store)
         }
         //*pte_store=temp;
         // Fill this function in
-        if(temp==NULL)
-                return NULL;
-        else
-                return pa2page(temp1);
+        return pa2page(temp1);
 
 }
 

@@ -30,13 +30,33 @@ sched_yield(void)
 
 	// LAB 4: Your code here.
 
+	int i,j,flag=0,next;
+	if(curenv == NULL)
+	{
+		i=0;
+		
+	}
+	else
+	{
+		i=ENVX(curenv->env_id);
+
+	}
+	for(j=0;j<NENV;j++)
+	{
+		i=(i+1)%NENV;	
+		if(envs[i].env_status == ENV_RUNNABLE)
+		{
+			env_run(&envs[i]);
+		}
+	}
+	if(curenv !=NULL && curenv->env_status == ENV_RUNNING)
+		env_run(curenv); 
 	// sched_halt never returns
 	sched_halt();
+
 }
 
-// Halt this CPU when there is nothing to do. Wait until the
-// timer interrupt wakes it up. This function never returns.
-//
+
 void
 sched_halt(void)
 {

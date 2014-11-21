@@ -11,6 +11,7 @@
 #include <kern/console.h>
 #include <kern/sched.h>
 #include <kern/time.h>
+#include <kern/e1000.h>
 
 // Print a string to the system console.
 // The string is exactly 'len' characters long.
@@ -430,10 +431,26 @@ static int
 sys_time_msec(void)
 {
 	// LAB 6: Your code here.
-	panic("sys_time_msec not implemented");
+	return time_msec();
+}
+// Send a packet out whose contents are mapped at [addr, addr+len)
+static int 
+sys_send_packet(void* addr,size_t len)
+{
+	//Check the pointer passed for User, read
+	user_mem_assert(curenv, addr, len, PTE_U);
+	int res = transmit_packet_e1000(addr, len);
+	return res;
 }
 
-
+static int
+sys_receive_packet(void *addr,size_t len)
+{
+	//Check the pointer passed for User, write
+	user_mem_assert(curenv, addr, len,  PTE_U | PTE_W);
+	int res = receive_packet_e1000(addr, len);
+	return res;
+}
 
 // Dispatches to the correct kernel function, passing the arguments.
 int64_t
@@ -477,6 +494,12 @@ syscall(uint64_t syscallno, uint64_t a1, uint64_t a2, uint64_t a3, uint64_t a4, 
 			return sys_ipc_recv((void *)a1);
 		case SYS_env_set_trapframe:
 			return sys_env_set_trapframe((envid_t)a1,(struct Trapframe *)a2);
+		case SYS_time_msec:
+			return sys_time_msec();
+		case SYS_send_packet:
+			return sys_send_packet((void *)a1, (size_t)a2);
+		case SYS_receive_packet:
+			return sys_receive_packet((void *)a1, (size_t)a2);
        	 	default:
                 	return -E_INVAL;
 

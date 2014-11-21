@@ -6,7 +6,7 @@
 #define VERSION "0.1"
 #define HTTP_VERSION "1.0"
 
-#define E_BAD_REQ	1000
+#define E_BAD_REQ 1000
 
 #define BUFFSIZE 512
 #define MAXPENDING 5	// Max connection requests
@@ -77,7 +77,18 @@ static int
 send_data(struct http_request *req, int fd)
 {
 	// LAB 6: Your code here.
-	panic("send_data not implemented");
+	//cprintf("Inside send_data\n");
+	int r,bufSize;
+	struct Stat stat;
+	r = fstat(fd,&stat);
+	bufSize = stat.st_size;
+	char buf[bufSize];
+	ssize_t nBytesRead = read(fd, buf, bufSize);
+	if(nBytesRead < 0)
+		die("send_data:Read failed");
+	if(write(req->sock, buf, nBytesRead) != nBytesRead)
+		die("send_data:Did not write all the bytes");
+	return 0;
 }
 
 static int
@@ -216,15 +227,37 @@ send_file(struct http_request *req)
 	int r;
 	off_t file_size = -1;
 	int fd;
-
+	struct Stat stat;
 	// open the requested url for reading
 	// if the file does not exist, send a 404 error using send_error
 	// if the file is a directory, send a 404 error using send_error
 	// set file_size to the size of the file
 
 	// LAB 6: Your code here.
-	panic("send_file not implemented");
-
+	fd = open(req->url, O_RDONLY);
+	//struct Fd *open_file = INDEX2FD(i);	
+	if(fd < 0)
+	{
+		cprintf("file %s does not exists\n",req->url);
+		r = send_error(req, 404);
+		if(r<0)
+			cprintf("send_file:send_error failed:%e\n",r);
+	}
+	r = fstat(fd, &stat);
+	if(r<0)
+	{
+		cprintf("send_file:fstat failed:%e\n",r);
+		r = send_error(req, 404);
+	}
+	if(stat.st_isdir == 1)
+	{
+		cprintf("file %s is a directory\n",req->url);
+		 r = send_error(req, 404);
+                if(r<0)
+                        cprintf("send_file:send_error failed:%e\n",r);
+	}
+	file_size = stat.st_size;
+	
 	if ((r = send_header(req, 200)) < 0)
 		goto end;
 
@@ -320,6 +353,7 @@ umain(int argc, char **argv)
 		{
 			die("Failed to accept client connection");
 		}
+		cprintf("\nAccepted client socket:%d\n",clientsock);
 		handle_client(clientsock);
 	}
 

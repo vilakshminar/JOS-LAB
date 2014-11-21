@@ -67,18 +67,30 @@ _pgfault_upcall:
 	// ways as registers become unavailable as scratch space.
 	//
 	// LAB 4: Your code here.
-
+		add $8, %rsp  					// For fault_va
+		add $8, %rsp 					// For error code
+		movq %rsp, %rax					// save the top of exception stack
+		movq 136(%rsp), %rbx				// trap time rsp
+		movq 120(%rsp), %rcx				// trap time rip
+		movq %rbx, %rsp					// move to trap time rsp
+		pushq %rcx					// push trap time rip to stack
 	// Restore the trap-time registers.  After you do this, you
 	// can no longer modify any general-purpose registers.
 	// LAB 4: Your code here.
-
+		movq %rax, %rsp                                 // go back to the exception stack
+		subq $8, 136(%rsp)  				// update this stack for the push we did
+		POPA_						// copy the register contents to the registers
 	// Restore eflags from the stack.  After you do this, you can
 	// no longer use arithmetic operations or anything else that
 	// modifies eflags.
 	// LAB 4: Your code here.
-
+		add $8, %rsp					//skip to the eflags value in the stack
+		popfq						// pop that value from the stack
 	// Switch back to the adjusted trap-time stack.
 	// LAB 4: Your code here.
-
+		popq %rsp					// switch back to the trap time stack
 	// Return to re-execute the instruction that faulted.
 	// LAB 4: Your code here.
+		ret						//return back to the instruction that faulted
+
+		

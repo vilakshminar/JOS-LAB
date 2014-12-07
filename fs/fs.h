@@ -11,8 +11,13 @@
 /* Maximum disk size we can handle (3GB) */
 #define DISKSIZE	0xC0000000
 
+#define MAX_BLOCK_CACHE_SIZE 249
+#define EVICT_BLOCK_CACHE_SIZE 10
+
+static int block_cache_count = 0;
 struct Super *super;		// superblock
 uint32_t *bitmap;		// bitmap blocks mapped in memory
+uint32_t *journal;
 
 /* ide.c */
 bool	ide_probe_disk1(void);
@@ -26,9 +31,11 @@ bool	va_is_mapped(void *va);
 bool	va_is_dirty(void *va);
 void	flush_block(void *addr);
 void	bc_init(void);
-
+void	eviction_policy(void);
 /* fs.c */
 void	fs_init(void);
+void	fs_check(void);
+void	check_root_dir(struct File f);
 int	file_get_block(struct File *f, uint32_t file_blockno, char **pblk);
 int	file_create(const char *path, struct File **f);
 int	file_open(const char *path, struct File **f);
@@ -38,11 +45,15 @@ int	file_set_size(struct File *f, off_t newsize);
 void	file_flush(struct File *f);
 int	file_remove(const char *path);
 void	fs_sync(void);
-
+int 	journal_write(struct File *f, const void *buf, size_t count, off_t offset);
+int 	journal_commit(struct File *f, const void *buf, size_t count, off_t offset);
+int 	journal_checkpoint();
+void	replay_journal();
+int	journal_file_write(struct File *f, const void *buf, size_t count, off_t offset);
 /* int	map_block(uint32_t); */
 bool	block_is_free(uint32_t blockno);
 int	alloc_block(void);
-
+int	get_journal_size();
 /* test.c */
 void	fs_test(void);
 

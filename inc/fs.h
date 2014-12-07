@@ -5,7 +5,6 @@
 
 #include <inc/types.h>
 #include <inc/mmu.h>
-
 // File nodes (both in-memory and on-disk)
 
 // Bytes per file system block - same as page size
@@ -25,6 +24,10 @@
 #define NINDIRECT	(BLKSIZE / 4)
 
 #define MAXFILESIZE	((NDIRECT + NINDIRECT) * BLKSIZE)
+
+#define JOURNALSTARTBLOCK 5000
+
+#define MAXJOURNALS	500
 
 struct File {
 	char f_name[MAXNAMELEN];	// filename
@@ -57,6 +60,19 @@ struct Super {
 	uint32_t s_magic;		// Magic number: FS_MAGIC
 	uint32_t s_nblocks;		// Total number of blocks on disk
 	struct File s_root;		// Root directory node
+};
+
+static uint32_t journal_count = 0;
+
+struct Journal
+{
+	uint8_t txBegin;
+	uint32_t bmap[320];
+	struct File file;
+	size_t count;
+	char buffer[BLKSIZE/4];
+	off_t offset;
+	uint8_t txEnd; 
 };
 
 // Definitions for requests from clients to file system

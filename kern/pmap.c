@@ -26,6 +26,9 @@ physaddr_t boot_cr3;		// Physical address of boot time page directory
 struct PageInfo *pages;		// Physical page state array
 static struct PageInfo *page_free_list;	// Free list of physical pages
 
+//uint64_t NUM_TX_DESC = 64;
+//uint64_t NUM_RX_DESC = 64;
+
 // --------------------------------------------------------------
 // Detect machine's physical memory setup.
 // --------------------------------------------------------------
@@ -215,6 +218,7 @@ boot_alloc(uint32_t n)
 	// to a multiple of PGSIZE.
 	//
 	// LAB 2: Your code here.
+
 	assert(nextfree!=NULL);
 	if(n>0)
         {
@@ -226,6 +230,8 @@ boot_alloc(uint32_t n)
                 result=nextfree;
         }
 	return (void *)result;
+
+
 }
 
 // Set up a four-level page table:
@@ -267,6 +273,12 @@ x64_vm_init(void)
 	// Make 'envs' point to an array of size 'NENV' of 'struct Env'.
 	// LAB 3: Your code here.
 	envs=(struct Env *)boot_alloc(NENV*sizeof(struct Env));
+	memset(envs, 0, NENV * sizeof(struct Env));
+	
+
+	//Allocate ontiguous physical memory for transmitter and receiver descriptor rings
+	//tranDescRing = boot_alloc(NUM_TX_DESC * 16);
+	//recvDescRing = boot_alloc(NUM_RX_DESC * 16);
 	
 	//////////////////////////////////////////////////////////////////////
 	// Now that we've allocated the initial kernel data structures, we set
@@ -275,9 +287,9 @@ x64_vm_init(void)
 	// particular, we can now map memory using boot_map_region or page_insert
 	
 	page_init();
-	check_page_free_list(1);
-        check_page_alloc();
-	page_check();
+	//check_page_free_list(1);
+        //check_page_alloc();
+	//page_check();
 	//////////////////////////////////////////////////////////////////////
 	// Now we set up virtual memory 
 	//////////////////////////////////////////////////////////////////////
@@ -319,7 +331,13 @@ x64_vm_init(void)
 	//      the PA range [0, npages*PGSIZE)
 	// Permissions: kernel RW, user NONE
 	// Your code goes here:
-	boot_map_region(boot_pml4e, KERNBASE, npages *PGSIZE, (physaddr_t)0x0, PTE_P | PTE_W);
+	boot_map_region(boot_pml4e, KERNBASE, npages *PGSIZE, (physaddr_t)0x0, PTE_P | PTE_W);	
+	
+	//Map the descriptor rings
+	//boot_map_region(boot_pml4e,(uint64_t)tranDescRing, NUM_TX_DESC*16, PADDR(tranDescRing),PTE_P | PTE_U | PTE_W);
+	//boot_map_region(boot_pml4e,(uint64_t)recvDescRing, NUM_RX_DESC*16, PADDR(recvDescRing),PTE_P | PTE_U | PTE_W);
+	
+	
 	// Check that the initial page directory has been set up correctly.
 	// Initialize the SMP-related parts of the memory map
 	mem_init_mp();
@@ -328,14 +346,26 @@ x64_vm_init(void)
 
 	//////////////////////////////////////////////////////////////////////
 	// Permissions: kernel RW, user NONE
-        pdpe_t *pdpe = KADDR(PTE_ADDR(pml4e[1]));
-        pde_t *pgdir = KADDR(PTE_ADDR(pdpe[0]));
+         lcr3(boot_cr3);
 
-        lcr3(boot_cr3);
+	pdpe_t *pdpe = KADDR(PTE_ADDR(pml4e[1]));
+        pde_t *pgdir = KADDR(PTE_ADDR(pdpe[0]));
+	
+
+	 check_page_free_list(1);
+        check_page_alloc();
+        page_check();
+
+        check_page_free_list(0);
+
+	
+        //lcr3(boot_cr3);
 	//check_page_free_list(1);
         //check_page_alloc();
         //page_check();
-	check_page_free_list(0);
+	//check_page_free_list(0);
+
+
 }
 
 
@@ -408,6 +438,7 @@ void page_init(void)
     // NB: Make sure you preserve the direction in which your page_free_list 
     // is constructed
 	// NB: Remember to mark the memory used for initial boot page table i.e (va>=BOOT_PAGE_TABLE_START && va < BOOT_PAGE_TABLE_END) as in-use (not free)
+
 	size_t i,temp;
         struct PageInfo *head = NULL,*tail=NULL;
 	physaddr_t phy;
@@ -471,6 +502,8 @@ void page_init(void)
 struct PageInfo *
 page_alloc(int alloc_flags)
 {
+	
+
 	// Fill this function in
 	struct PageInfo* page=page_free_list;
 	if(page_free_list == NULL)
@@ -484,6 +517,9 @@ page_alloc(int alloc_flags)
 	page_free_list=page->pp_link;
 	page->pp_link=NULL;
 	return page;
+
+
+
 }
 
 //
@@ -506,10 +542,14 @@ page_free(struct PageInfo *pp)
 	// Fill this function in
 	// Hint: You may want to panic if pp->pp_ref is nonzero or
 	// pp->pp_link is not NULL.
+	
+
 	struct PageInfo *page=page_free_list;
         assert(pp->pp_ref ==0 && pp->pp_link ==NULL);
 	pp->pp_link=page;
 	page_free_list=pp;
+
+
 }
 
 //
@@ -551,38 +591,6 @@ page_decref(struct PageInfo* pp)
 pte_t *
 pml4e_walk(pml4e_t *pml4e, const void *va, int create)
 {
-	/*pte_t *result;
-	struct PageInfo *npage=NULL;
-	uint64_t temp1,temp2,temp3;
-	uint64_t *ptemp1,*ptemp2,*ptemp3;
-	uintptr_t la=(uintptr_t) va;
-	ptemp1=pml4e;
-	ptemp1+=PML4(la);
-	temp1=*ptemp1;
-	cprintf("PML4EWALK:temp1:%0x ptemp1:%0x PTE_ADDR:%0x\n",temp1,ptemp1,PTE_ADDR(temp1));
-	ptemp2=(uint64_t *)KADDR(PTE_ADDR(temp1));
-	if(ptemp2==NULL && create==false)
-                return NULL;
-        else if(ptemp2==NULL)
-        {	
-		npage=page_alloc(1);
-                assert(npage!=NULL);
-                if(npage==NULL)
-                	return NULL;
-                assert(npage->pp_ref==0);
-                ++npage->pp_ref;
-                ptemp3=(uint64_t *)page2kva(npage);
-                temp3=(uint64_t)ptemp3;
-                *ptemp1=(uint64_t)(temp3 | PTE_P | PTE_W |PTE_U);
-	}
- 	result=pdpe_walk(ptemp3,(const void *)la,true);
-        if(result==NULL)
-        {
-                page_free(npage);
-                *ptemp1=(uint64_t)NULL;
-        }
-
-	return result;*/
         physaddr_t pdpeaddr;
         pte_t *result;
         physaddr_t temp;
@@ -630,37 +638,6 @@ pml4e_walk(pml4e_t *pml4e, const void *va, int create)
 pte_t *
 pdpe_walk(pdpe_t *pdpe,const void *va,int create)
 {
-	/*pte_t *result;
-        struct PageInfo *npage=NULL;
-        uint64_t temp1,temp2,temp3;
-        uint64_t *ptemp1,*ptemp2,*ptemp3;
-	uintptr_t la=(uintptr_t) va;
-        ptemp1=pdpe;
-        ptemp1+=PDPE(la);
-        temp1=*ptemp1;
-        ptemp2=(uint64_t *)KADDR(PTE_ADDR(temp1));
-	cprintf("PDPDWALK:temp1:%0x ptemp1:%0x PTE_ADDR:%0x\n",temp1,ptemp1,PTE_ADDR(temp1));
-        if(ptemp2==NULL && create==false)
-                return NULL;
-        else if(ptemp2==NULL)
-        {
-                npage=page_alloc(1);
-                assert(npage!=NULL);
-                if(npage==NULL)
-                        return NULL;
-                assert(npage->pp_ref==0);
-                ++npage->pp_ref;
-                ptemp3=(uint64_t *)page2kva(npage);
-                temp3=(uint64_t)ptemp3;
-                *ptemp1=(uint64_t)(temp3 | PTE_P | PTE_W |PTE_U);
-        }
-        result=pgdir_walk(ptemp3,(const void *)la,true);
-        if(result==NULL)
-        {
-                page_free(npage);
-                *ptemp1=(uint64_t)NULL;
-        }
-        return result;*/
 	physaddr_t pdeaddr,temp;
         pte_t *result;
         uintptr_t la=(uintptr_t) va;
@@ -711,34 +688,6 @@ pdpe_walk(pdpe_t *pdpe,const void *va,int create)
 pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create)
 {
 
-	/*pte_t *result;
-        struct PageInfo *npage=NULL;
-        uint64_t temp1,temp2,temp3;
-        uint64_t *ptemp1,*ptemp2,*ptemp3;
-        uintptr_t la=(uintptr_t) va;
-	ptemp1=pgdir;
-        ptemp1+=PDX(la);
-        temp1=*ptemp1;
-	cprintf("PGDIRWWALK:temp1:%0x ptemp1:%0x PTE_ADDR:%0x\n",temp1,ptemp1,PTE_ADDR(temp1));
-        ptemp2=(uint64_t *)KADDR(PTE_ADDR(temp1));
-        if(ptemp2==NULL && create==false)
-                return NULL;
-        else if(ptemp2==NULL)
-        {
-                npage=page_alloc(1);
-                assert(npage!=NULL);
-                if(npage==NULL)
-                        return NULL;
-                assert(npage->pp_ref==0);
-                ++npage->pp_ref;
-                ptemp3=(uint64_t *)page2kva(npage);
-                temp3=(uint64_t)ptemp3;
-                *ptemp1=(uint64_t)(temp3 | PTE_P | PTE_W |PTE_U);
-        }
-        ptemp3+=PTX(la);
-	assert(ptemp3!=NULL);
-	result=ptemp3;
-        return result;*/
 	physaddr_t pteaddr,temp,temp1;
         pte_t *resultptr;
         pte_t *result;
@@ -792,21 +741,7 @@ pte_t *pgdir_walk(pde_t *pgdir, const void *va, int create)
 static void boot_map_region(pml4e_t *pml4e, uintptr_t la, size_t size, physaddr_t pa, int perm)
 {
 	// Fill this function in
-	/*uint64_t noe;
-	pte_t *temp;
-	uint64_t temp1;
-	int i;
-        noe=(uint64_t)size/PGSIZE;
-        for(i=0;i<noe;i++)
-        {
-                temp=pml4e_walk(pml4e,(void*)la,1);
-                temp1=(pa+(i*PGSIZE));
-                temp1=temp1<<12;
-                temp1=temp1|perm|PTE_P;
-                *temp=temp1;
-                la+=PGSIZE;
 
-        }*/
 	uint64_t noe;
 	pte_t *temp;
 	int i;
@@ -822,6 +757,9 @@ static void boot_map_region(pml4e_t *pml4e, uintptr_t la, size_t size, physaddr_
                 la+=PGSIZE;
 
         }
+
+
+
 }
 
 //
@@ -853,65 +791,33 @@ int
 page_insert(pml4e_t *pml4e, struct PageInfo *pp, void *va, int perm)
 {
 	// Fill this function in
-	/*struct PageInfo* lookup;
-        pte_t *ptestore;
+	//struct PageInfo* lookup;
+       // pte_t *ptestore;
         pte_t *entry;
         uint64_t pte;
-        int success=0;
-        lookup=page_lookup(pml4e,va,&ptestore);
-        if(lookup!=NULL)
+	physaddr_t pg_entry,ppconv;
+        entry=pml4e_walk(pml4e,va,1);
+	if(entry!=NULL)
         {
-                page_remove(pml4e,va);
-                tlb_invalidate(pml4e,va);
-        }
-                pte=(uint64_t)page2pa(pp);
-                //pte=pte<<12;
-                pte=pte | (perm | PTE_P);
-                entry=pml4e_walk(pml4e,va,1);
-                if(entry!=NULL)
+		pg_entry = PTE_ADDR(*entry);
+                ppconv = page2pa(pp);
+                if (pg_entry == ppconv)
                 {
-                        *entry=pte;
-                        success=1;
+                	*entry = pg_entry|perm|PTE_P;
+                        tlb_invalidate(pml4e, va);
+                        return 0;
                 }
-                else
-                        success=0;
-        if(success)
-        {
-		++pp->pp_ref;
-                return 0;
-        }
-        else
-                return -E_NO_MEM;*/
-	struct PageInfo* lookup;
-        pte_t *ptestore;
-        pte_t *entry;
-        uint64_t pte;
-        int success=0;
-        lookup=page_lookup(pml4e,va,&ptestore);
-        if(lookup!=NULL)
-        {
-                page_remove(pml4e,va);
-                tlb_invalidate(pml4e,va);
-        }
-                pte=(uint64_t)page2pa(pp);
-              //  pte=pte<<12;
-                pte=pte | (perm | PTE_P);
-                entry=pml4e_walk(pml4e,va,1);
-                if(entry!=NULL)
-                {
-                        *entry=pte;
-                        success=1;
+                if(*entry!=0)
+		{
+            		page_remove(pml4e, va);
+            		tlb_invalidate(pml4e, va);
                 }
-                else
-                        success=0;
-        if(success)
-        {
-                //return 0;
-                ++pp->pp_ref;
-                return 0;
-        }
-        else
-                return -E_NO_MEM;
+		*entry = ppconv;
+        	*entry= (*entry) | perm | PTE_P;
+        	pp->pp_ref = pp->pp_ref + 1;
+    		return 0;
+   	}	 
+    	return -E_NO_MEM;
 }
 
 //
@@ -929,23 +835,6 @@ struct PageInfo *
 page_lookup(pml4e_t *pml4e, void *va, pte_t **pte_store)
 {
 	// Fill this function in
-	/*struct PageInfo *page;
-        uint64_t addr;
-        pte_t *temp;
-        temp=pml4e_walk(pml4e,va,0);
-        addr=*temp;
-        addr= addr & ~0xfff;
-        page=pa2page((physaddr_t)addr);
-        if(pte_store!=NULL)
-        {
-                pte_store=(pte_t **)temp;
-
-        }
-        // Fill this function in
-        if(temp==NULL)
-                return NULL;
-        else
-                return page;*/
 	struct PageInfo *page;
         pte_t *temp;
         temp=pml4e_walk(pml4e,va,0);
@@ -985,16 +874,6 @@ void
 page_remove(pml4e_t *pml4e, void *va)
 {
 	// Fill this function in
-	/*struct PageInfo *page;
-        pte_t *ptestore;
-	pte_t *lookup;
-        page=page_lookup(pml4e,va,&ptestore);
-        if(page==NULL)
-                return;
-        page_decref(page);
-        lookup=pml4e_walk(pml4e,va,0);
-        *lookup=0;
-        tlb_invalidate(pml4e,va);*/
 	struct PageInfo *page;
         pte_t *ptestore,*lookup;
         page=page_lookup(pml4e,va,&ptestore);

@@ -50,6 +50,7 @@ uint32_t nblocks;
 char *diskmap, *diskpos;
 struct Super *super;
 uint32_t *bitmap;
+uint32_t *journal;
 
 void
 panic(const char *fmt, ...)
@@ -62,6 +63,18 @@ panic(const char *fmt, ...)
         fputc('\n', stderr);
 	abort();
 }
+
+void
+myprint(const char *fmt, ...)
+{
+        va_list ap;
+
+        va_start(ap, fmt);
+        vfprintf(stdout, fmt, ap);
+        va_end(ap);
+        fputc('\n', stdout);
+}
+
 
 void
 readn(int f, void *out, size_t n)
@@ -120,8 +133,10 @@ opendisk(const char *name)
 	strcpy(super->s_root.f_name, "/");
 
 	nbitblocks = (nblocks + BLKBITSIZE - 1) / BLKBITSIZE;
+	myprint("nbitbloxks*BLKSIZE:%d",nbitblocks * BLKSIZE);
 	bitmap = alloc(nbitblocks * BLKSIZE);
 	memset(bitmap, 0xFF, nbitblocks * BLKSIZE);
+	memset(bitmap+156, 0x00, 600/4);
 }
 
 void

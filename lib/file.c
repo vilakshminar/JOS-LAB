@@ -41,6 +41,8 @@ struct Dev devfile =
 	.dev_read =	devfile_read,
 	.dev_close =	devfile_flush,
 	.dev_stat =	devfile_stat,
+	.dev_write =    devfile_write,
+	.dev_trunc =	devfile_trunc
 };
 
 // Open a file (or directory).
@@ -67,6 +69,7 @@ open(const char *path, int mode)
 	// file descriptor.
 
 	// LAB 5: Your code here
+	
 	struct Fd *fd;
 	int r;
 	
@@ -83,6 +86,9 @@ open(const char *path, int mode)
 		return r;
 	}
 	return fd2num(fd);
+	
+
+
 }
 
 // Flush the file descriptor.  After this the fileid is invalid.
@@ -122,10 +128,38 @@ devfile_read(struct Fd *fd, void *buf, size_t n)
 		return r;
 	}
 	if(r > 0)
-		memmove(buf, fsipcbuf.readRet.ret_buf, r);
+		memmove(buf, (void *)&fsipcbuf.readRet.ret_buf, r);
+	return r;
+
+
+
+}
+
+
+static ssize_t
+devfile_write(struct Fd *fd, const void *buf, size_t n)
+{
+
+	ssize_t r,status;
+	fsipcbuf.write.req_fileid = fd -> fd_file.id;
+	//fsipcbuf.write.req_n=n;
+	if(n > (PGSIZE - (sizeof(int) + sizeof(size_t)))) 
+		n = (PGSIZE - (sizeof(int) + (sizeof(size_t))));
+	fsipcbuf.write.req_n=n;
+	memmove(fsipcbuf.write.req_buf, buf, n);
+	r = fsipc(FSREQ_WRITE, NULL);
 	return r;
 }
 
+
+
+static int
+devfile_trunc(struct Fd *fd, off_t size)
+{
+	fsipcbuf.set_size.req_fileid = fd->fd_file.id;
+	fsipcbuf.set_size.req_size = size;
+	return fsipc(FSREQ_SET_SIZE, NULL);
+}
 
 static int
 devfile_stat(struct Fd *fd, struct Stat *st)
@@ -140,5 +174,3 @@ devfile_stat(struct Fd *fd, struct Stat *st)
 	st->st_isdir = fsipcbuf.statRet.ret_isdir;
 	return 0;
 }
-
-

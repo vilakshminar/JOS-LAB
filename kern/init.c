@@ -84,7 +84,7 @@ i386_init(void)
 #else
 	// Touch all you want.
 //<<<<<<< HEAD
-	ENV_CREATE(user_spawnhello, ENV_TYPE_USER);
+	//ENV_CREATE(user_spawnhello, ENV_TYPE_USER);
 #endif // TEST*
 
 	// Should not be necessary - drains keyboard because interrupt has given up.

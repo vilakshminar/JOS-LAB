@@ -124,16 +124,31 @@ serve_open(envid_t envid, struct Fsreq_open *req,
 	}
 	fileid = r;
 
-	if (req->req_omode != 0) {
-		if (debug)
-			cprintf("file_open omode 0x%x unsupported", req->req_omode);
-		return -E_INVAL;
+	// Open the file
+	if (req->req_omode & O_CREAT) {
+		if ((r = file_create(path, &f)) < 0) {
+			if (!(req->req_omode & O_EXCL) && r == -E_FILE_EXISTS)
+				goto try_open;
+			if (debug)
+				cprintf("file_create failed: %e", r);
+			return r;
+		}
+	} else {
+try_open:
+		if ((r = file_open(path, &f)) < 0) {
+			if (debug)
+				cprintf("file_open failed: %e", r);
+			return r;
+		}
 	}
 
-	if ((r = file_open(path, &f)) < 0) {
-		if (debug)
-			cprintf("file_open failed: %e", r);
-		return r;
+	// Truncate
+	if (req->req_omode & O_TRUNC) {
+		if ((r = file_set_size(f, 0)) < 0) {
+			if (debug)
+				cprintf("file_set_size failed: %e", r);
+			return r;
+		}
 	}
 
 	// Save the file pointer
@@ -156,6 +171,29 @@ serve_open(envid_t envid, struct Fsreq_open *req,
 	return 0;
 }
 
+// Set the size of req->req_fileid to req->req_size bytes, truncating
+// or extending the file as necessary.
+int
+serve_set_size(envid_t envid, struct Fsreq_set_size *req)
+{
+	struct OpenFile *o;
+	int r;
+
+	if (debug)
+		cprintf("serve_set_size %08x %08x %08x\n", envid, req->req_fileid, req->req_size);
+
+	// Every file system IPC call has the same general structure.
+	// Here's how it goes.
+
+	// First, use openfile_lookup to find the relevant open file.
+	// On failure, return the error code to the client with ipc_send.
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+
+	// Second, call the relevant file system function (from fs/fs.c).
+	// On failure, return the error code to the client.
+	return file_set_size(o->o_file, req->req_size);
+}
 
 // Read at most ipc->read.req_n bytes from the current seek position
 // in ipc->read.req_fileid.  Return the bytes read from the file to
@@ -179,6 +217,7 @@ serve_read(envid_t envid, union Fsipc *ipc)
 	// so filling in ret will overwrite req.
 	//
 	// LAB 5: Your code here
+	
 	ssize_t nBytes;
 	int count = req->req_n;
 	if(count>PGSIZE)
@@ -187,11 +226,39 @@ serve_read(envid_t envid, union Fsipc *ipc)
                 return r;
 		
 	nBytes=file_read(o->o_file, ret->ret_buf, count, o->o_fd->fd_offset);
+	if(nBytes < 0)
+		return nBytes;
 	o->o_fd->fd_offset += nBytes;
 	return nBytes;
+
+
 }
 
 
+// Write req->req_n bytes from req->req_buf to req_fileid, starting at
+// the current seek position, and update the seek position
+// accordingly.  Extend the file if necessary.  Returns the number of
+// bytes written, or < 0 on error.
+int
+serve_write(envid_t envid, struct Fsreq_write *req)
+{
+	if (debug)
+		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
+
+  	struct OpenFile *o;
+        int r,nBytes;
+
+        if((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+                return r;
+
+	nBytes = file_write(o->o_file,req->req_buf,req->req_n, o->o_fd->fd_offset);
+        if(nBytes <0)        
+		return nBytes;
+
+        o->o_fd->fd_offset += nBytes;
+        return nBytes;
+
+}
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
 // caller in ipc->statRet.
@@ -215,11 +282,48 @@ serve_stat(envid_t envid, union Fsipc *ipc)
 	return 0;
 }
 
-
-// Our read-only file system do nothing for flush
+// Flush all data and metadata of req->req_fileid to disk.
 int
 serve_flush(envid_t envid, struct Fsreq_flush *req)
 {
+	struct OpenFile *o;
+	int r;
+
+	if (debug)
+		cprintf("serve_flush %08x %08x\n", envid, req->req_fileid);
+
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+	file_flush(o->o_file);
+	return 0;
+}
+
+// Remove the file req->req_path.
+int
+serve_remove(envid_t envid, struct Fsreq_remove *req)
+{
+	char path[MAXPATHLEN];
+	int r;
+
+	if (debug)
+		cprintf("serve_remove %08x %s\n", envid, req->req_path);
+
+	// Delete the named file.
+	// Note: This request doesn't refer to an open file.
+
+	// Copy in the path, making sure it's null-terminated
+	memmove(path, req->req_path, MAXPATHLEN);
+	path[MAXPATHLEN-1] = 0;
+
+	// Delete the specified file
+	return file_remove(path);
+}
+
+// Sync the file system.
+int
+serve_sync(envid_t envid, union Fsipc *req)
+{
+	fs_sync();
 	return 0;
 }
 
@@ -231,6 +335,10 @@ fshandler handlers[] = {
 	[FSREQ_READ] =		serve_read,
 	[FSREQ_STAT] =		serve_stat,
 	[FSREQ_FLUSH] =		(fshandler)serve_flush,
+	[FSREQ_SET_SIZE] =	(fshandler)serve_set_size,
+	[FSREQ_WRITE] =		(fshandler)serve_write,
+	[FSREQ_REMOVE] =	(fshandler)serve_remove,
+	[FSREQ_SYNC] =		serve_sync
 };
 #define NHANDLERS (sizeof(handlers)/sizeof(handlers[0]))
 

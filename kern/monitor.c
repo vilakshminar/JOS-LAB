@@ -65,7 +65,7 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
 	// Your code here.
 	uint64_t *ptr,num,var,*rip,rbp;
         int i;
-        rbp=read_rbp();
+	rbp=read_rbp();
         ptr=(uint64_t*)rbp;
         struct Ripdebuginfo dbginfo;
         read_rip(var);
@@ -78,11 +78,11 @@ mon_backtrace(int argc, char **argv, struct Trapframe *tf)
                  for(i=1;i<dbginfo.rip_fn_narg+1;i++)
                         cprintf("%016llx ",(*(ptr-i))>>32);
                  cprintf("\n");
-                 var=*(ptr+1);
+		 var=*(ptr+1);
                  num=*ptr;
                  ptr=(uint64_t*) num;
-        }while(ptr!=0);
-	return 0;
+         }while(ptr!=0);
+return 0;
 }
 
 

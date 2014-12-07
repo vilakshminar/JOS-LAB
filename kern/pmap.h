@@ -17,6 +17,11 @@ extern size_t npages;
 
 extern pml4e_t *boot_pml4e;
 
+#define NUM_TX_DESC 64
+#define NUM_RX_DESC 64
+
+//uint64_t *tranDescRing;
+//uint64_t *recvDescRing;
 
 /* This macro takes a kernel virtual address -- an address that points above
  * KERNBASE, where the machine's maximum 256MB of physical memory is mapped --
